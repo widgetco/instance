@@ -33,7 +33,7 @@ def pull_and_reinstall_crontab(repo_name, instance_id):
     rlog("Pulled repo {}".format(repo_name))
     if os.path.exists("%s/Cronfile" % repo_name):
         rlog("Cronfile exists, reinstalling crontab")
-        os.system("crontab Cronfile")
+        os.system("crontab %s/Cronfile" % repo_name)
         rlog("Reinstalled crontab")
 
 def main():
