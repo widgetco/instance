@@ -2,6 +2,7 @@ from datetime import datetime
 import redis
 import requests
 import os
+import subprocess
 
 appredis = None
 job_queue = None
@@ -43,22 +44,24 @@ def main():
     repo_name = get_metadata_from_host("repo-name")
     job_queue = get_metadata_from_host("job-queue")
     redis_url = get_metadata_from_host("redis-url")
+    appredis = redis.StrictRedis.from_url(redis_url)
+
     rlog("Started... {}".format(locals()))
 
     clone_repo_if_not_exists(repo_clone_url, github_token, repo_name, instance_id)
     pull_and_reinstall_crontab(repo_name, instance_id)
     rlog("Pulled repo {}".format(repo_name))
 
-    appredis = redis.StrictRedis.from_url(redis_url)
-    appredis.rpush(job_queue + ":logs", "Restarted " + instance_id)
+    rlog("Init complete")
 
     while True:
-        print("Waiting for job...")
+        rlog("Waiting for job...")
         job = appredis.blpop(job_queue, timeout=0)[1].decode("utf-8")
-        print("Got job: {}".format(job))
-        appredis.rpush(job_queue + ":logs", "Got job: " + job)
+        rlog("Got job: {}".format(job))
         # do the job
-        appredis.rpush(job_queue + ":logs", "Finished job: " + job)
+        out = subprocess.check_output("cd {} && {}".format(repo_name, job), shell=True)
+        rlog(out)
+        rlog("Job complete.")
 
 
 
