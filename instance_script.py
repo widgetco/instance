@@ -10,7 +10,7 @@ def slack(message, instance_id):
     requests.post(SLACK_URL, json=data)
 
 def get_metadata_from_host(key):
-    return requests.get("169.254.169.250/latest/meta-data/" + key).text
+    return requests.get("http://169.254.169.250/latest/meta-data/" + key).text
 
 def clone_repo_if_not_exists(repo_clone_path, github_token, repo_name, instance_id):
     # checks to see if directory 'repo_name' exists
