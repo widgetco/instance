@@ -25,7 +25,7 @@ def clone_repo_if_not_exists(repo_clone_path, github_token, repo_name, instance_
     # github_token is the github token for the repo
     cmd = ("git clone https://%s@github.com/" % github_token) + repo_clone_path + " " + repo_name
     if not os.path.exists(repo_name):
-        rlog("Cloning repo {}".format(cmd), instance_id)
+        rlog("Cloning repo {}".format(cmd))
         os.system(cmd)
 
 def pull_and_reinstall_crontab(repo_name, instance_id):
@@ -34,7 +34,7 @@ def pull_and_reinstall_crontab(repo_name, instance_id):
     if os.path.exists("%s/Cronfile" % repo_name):
         rlog("Cronfile exists, reinstalling crontab")
         os.system("crontab Cronfile")
-        rlog("Reinstalled crontab", instance_id)
+        rlog("Reinstalled crontab")
 
 def main():
     github_token = get_metadata_from_host("github-token")
