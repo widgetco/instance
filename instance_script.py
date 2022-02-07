@@ -1,13 +1,18 @@
+from datetime import datetime
 import redis
 import requests
 import os
 
-SLACK_URL = 'https://hooks.slack.com/services/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'
+appredis = None
+job_queue = None
+instance_id = None
 
-def slack(message, instance_id):
-    print(message)
-    data = {'text': ('guest *%s*\n' % instance_id) + str(message)}
-    requests.post(SLACK_URL, json=data)
+def rlog(message):
+    global appredis, job_queue, instance_id
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = instance_id + ":" + stamp + ":" + str(message)
+    print(line)
+    appredis.rpush(job_queue + ":logs", line)
 
 def get_metadata_from_host(key):
     return requests.get("http://169.254.169.250/latest/meta-data/" + key).text
@@ -19,24 +24,30 @@ def clone_repo_if_not_exists(repo_clone_path, github_token, repo_name, instance_
     # github_token is the github token for the repo
     cmd = ("git clone https://%s@github.com/" % github_token) + repo_clone_path + " " + repo_name
     if not os.path.exists(repo_name):
-        slack("Cloning repo {}".format(cmd), instance_id)
+        rlog("Cloning repo {}".format(cmd), instance_id)
         os.system(cmd)
 
+def pull_and_reinstall_crontab(repo_name, instance_id):
+    os.system("cd {} && git pull".format(repo_name))
+    rlog("Pulled repo {}".format(repo_name))
+    if os.path.exists("%s/Cronfile" % repo_name):
+        rlog("Cronfile exists, reinstalling crontab")
+        os.system("crontab Cronfile")
+        rlog("Reinstalled crontab", instance_id)
 
 def main():
+    global appredis, job_queue, instance_id
     instance_id = get_metadata_from_host("instance-id")
     github_token = get_metadata_from_host("github-token")
     repo_clone_url = get_metadata_from_host("repo-clone-url")
     repo_name = get_metadata_from_host("repo-name")
     job_queue = get_metadata_from_host("job-queue")
     redis_url = get_metadata_from_host("redis-url")
-    print("Started... {}".format(locals()))
-    slack("Started... {}".format(locals()), instance_id)
+    rlog("Started... {}".format(locals()))
 
     clone_repo_if_not_exists(repo_clone_url, github_token, repo_name, instance_id)
-    os.system("cd {} && git pull".format(repo_name))
-    print(os.listdir("."))
-    slack("Pulled repo {}".format(repo_name), instance_id)
+    pull_and_reinstall_crontab(repo_name, instance_id)
+    rlog("Pulled repo {}".format(repo_name))
 
     appredis = redis.StrictRedis.from_url(redis_url)
     appredis.rpush(job_queue + ":logs", "Restarted " + instance_id)
