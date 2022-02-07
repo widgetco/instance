@@ -4,19 +4,19 @@ import requests
 import os
 import subprocess
 
-appredis = None
-job_queue = None
-instance_id = None
+def get_metadata_from_host(key):
+    return requests.get("http://169.254.169.250/latest/meta-data/" + key).text
+
+appredis = redis.StrictRedis.from_url(get_metadata_from_host("redis-url"))
+job_queue = get_metadata_from_host("job-queue")
+instance_id = get_metadata_from_host("instance-id")
 
 def rlog(message):
-    global appredis, job_queue, instance_id
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = instance_id + ":" + stamp + ":" + str(message)
     print(line)
     appredis.rpush(job_queue + ":logs", line)
 
-def get_metadata_from_host(key):
-    return requests.get("http://169.254.169.250/latest/meta-data/" + key).text
 
 def clone_repo_if_not_exists(repo_clone_path, github_token, repo_name, instance_id):
     # checks to see if directory 'repo_name' exists
@@ -37,15 +37,10 @@ def pull_and_reinstall_crontab(repo_name, instance_id):
         rlog("Reinstalled crontab", instance_id)
 
 def main():
-    global appredis, job_queue, instance_id
-    instance_id = get_metadata_from_host("instance-id")
     github_token = get_metadata_from_host("github-token")
     repo_clone_url = get_metadata_from_host("repo-clone-url")
     repo_name = get_metadata_from_host("repo-name")
-    job_queue = get_metadata_from_host("job-queue")
-    redis_url = get_metadata_from_host("redis-url")
-    appredis = redis.StrictRedis.from_url(redis_url)
-
+    
     rlog("Started... {}".format(locals()))
 
     clone_repo_if_not_exists(repo_clone_url, github_token, repo_name, instance_id)
